@@ -149,7 +149,6 @@
 		 (sin-r (sin radians))
 		 (spatial-scale (* noise-scale (+ 1.0 (* angle 0.002))))
 		 (base-growth (* 0.06 angle))
-		 ;; Sample 3D noise field.
 		 (n-val (perlin-noise-3d (* cos-r spatial-scale)
 					 (+ (* sin-r spatial-scale) time-step)
 					 angle))
@@ -166,8 +165,7 @@
 		      dynamic-color)
 	    (loop (+ angle 5.0) x y))))))
 
-
-(InitWindow screen-width screen-height "raylib [shapes] example - basic shapes")
+(InitWindow screen-width screen-height "raylib noisy-spiral")
 (SetTargetFPS 60)
 (define t 0)
 
