@@ -24,20 +24,21 @@
 
         # Override the existing tic-80 package to inject the Pro CMake flag
         guile_3_0-wrapped = if system == "x86_64-linux" then
-          pkgs.writeShellScriptBin "guile3.0" ''
+          pkgs.writeShellScriptBin "guile" ''
             if [ -e /etc/NIXOS ]; then
-                exec ${guile_3_0}/bin/guile3.0 "$@"
+                exec ${pkgs.guile_3_0}/bin/guile "$@"
             else
                 # Non-NixOS x86_64 Linux
-                exec ${pkgs.nixgl.nixGLMesa}/bin/nixGLMesa ${guile_3_0}/bin/guile3.0 "$@"
+                exec ${pkgs.nixgl.nixGLMesa}/bin/nixGLMesa ${pkgs.guile_3_0}/bin/guile "$@"
             fi
             ''
         else
-          guile_3_0;
+          pkgs.guile_3_0;
       in
       {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
+            gmp
             guile_3_0-wrapped
             raylib
           ];
