@@ -184,7 +184,7 @@
 				   (/ (+ sine-wave 1.0) 2.0))))
 	   (growth-sine (sin (- (* t 0.015) 1.5708)))
 	   (normalized-growth (/ (+ growth-sine 1.0) 2.0))
-	   (current-rotations (* normalized-growth 8.0))
+	   (current-rotations (* normalized-growth 10.0))
 	   (center-x (/ screen-width 2))
 	   (center-y (/ screen-height 2)))
       (my-noise-spiral center-x center-y 4 spiral-intensity current-rotations))
