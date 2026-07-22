@@ -14,6 +14,9 @@
       flake-utils,
       nixgl,
     }:
+    let
+      mkRaylibGuile = pkgs: pkgs.callPackage ./default.nix { };
+    in
     flake-utils.lib.eachDefaultSystem (
       system:
       let
@@ -22,7 +25,8 @@
           inherit system overlays;
         };
 
-        # Override the existing tic-80 package to inject the Pro CMake flag
+        raylib-guile = mkRaylibGuile pkgs;
+
         guile_3_0-wrapped = if system == "x86_64-linux" then
           pkgs.writeShellScriptBin "guile" ''
             if [ -e /etc/NIXOS ]; then
@@ -36,13 +40,27 @@
           pkgs.guile_3_0;
       in
       {
+        packages = {
+          default = raylib-guile;
+          raylib-guile = raylib-guile;
+        };
+
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             gmp
             guile_3_0-wrapped
             raylib
+            raylib-guile
           ];
+          shellHook = ''
+            export GUILE_LOAD_PATH="$PWD:$GUILE_LOAD_PATH"
+            export GUILE_EXTENSIONS_PATH="$PWD:$GUILE_EXTENSIONS_PATH"
+          '';
         };
       }
-    );
+    ) // {
+      overlays.default = final: prev: {
+        raylib-guile = mkRaylibGuile final;
+      };
+    };
 }
