@@ -1,4 +1,4 @@
-#!/usr/bin/guile -s
+#!/usr/bin/env guile
 !#
 (use-modules (sxml simple)
              (ice-9 format)
@@ -176,9 +176,17 @@
       ("Texture2D" . "Texture")
       ("TextureCubemap" . "Texture")
       ("RenderTexture2D" . "RenderTexture")
-      ("Camera" . "Camera3D")))
-  (define entry (assoc type aliases))
-  (if entry (cdr entry) type))
+      ("Camera" . "Camera3D")
+      ("ModelAnimPose" . "Transform *")))
+  (cond
+   ((assoc type aliases) => cdr)
+   ((and (>= (string-length type) 2)
+         (string= (substring type (- (string-length type) 2)) " *"))
+    (let ((base (substring type 0 (- (string-length type) 2))))
+      (cond
+       ((assoc base aliases) => (lambda (target) (string-append (cdr target) " *")))
+       (else type))))
+   (else type)))
 
 (define (sanitize-type type)
   (string-replace-substring
@@ -194,7 +202,7 @@
 
 (define (scm->c port type expr)
   (define stype (sanitize-type type))
-  (define dtype (sanitize-type (deptr-type type)))
+  (define dtype (sanitize-type (deptr-type stype)))
   (cond
    ((or (string= stype "char *") (string= stype "uchar *"))
     (let ((local (genlocal)))
@@ -205,14 +213,14 @@
     (format #f "(*(~a*)scm_foreign_object_ref(~a, 0))" stype expr))
    ((member dtype struct-names)
     (format port "    scm_assert_foreign_object_type(rgtype_~a, ~a);\n" dtype expr)
-    (format #f "scm_foreign_object_ref(~a, 0)" expr))
+    (format #f "((~a)scm_foreign_object_ref(~a, 0))" stype expr))
    ((string= stype "float") (format #f "scm_to_double(~a)" expr))
-   ((string-contains type "*") (format #f "scm_to_pointer(~a)" expr))
+   ((string-contains stype "*") (format #f "scm_to_pointer(~a)" expr))
    (else (format #f "scm_to_~a(~a)" stype expr))))
 
 (define (c->scm port type expr)
   (define stype (sanitize-type type))
-  (define dtype (sanitize-type (deptr-type type)))
+  (define dtype (sanitize-type (deptr-type stype)))
   (cond
    ((or (string= stype "char *") (string= stype "uchar *"))
     (format #f "scm_from_utf8_string(~a)" expr))
@@ -225,7 +233,7 @@
               stype local expr local local stype)
       (format #f "scm_make_foreign_object_1(rgtype_~a, ~a)" stype local)))
    ((string= stype "float") (format #f "scm_from_double(~a)" expr))
-   ((string-contains type "*") (format #f "scm_from_pointer(~a, NULL)" expr))
+   ((string-contains stype "*") (format #f "scm_from_pointer(~a, NULL)" expr))
    (else (format #f "scm_from_~a(~a)" stype expr))))
 
 (define (generate-function f port)
