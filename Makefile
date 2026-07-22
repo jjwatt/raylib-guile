@@ -15,7 +15,7 @@ install: all
 	install -m 644 raylib.scm $(DESTDIR)$(GUILE_SITEDIR)
 
 libraylib-guile.so: raylib-guile.c
-	$(CC) $(CFLAGS) `pkg-config --cflags guile-3.0 raylib` -shared -o $@ -fPIC $^ `pkg-config --libs raylib` $(LDFLAGS)
+	$(CC) $(CFLAGS) `pkg-config --cflags guile-3.0 raylib` -shared -o $@ -fPIC $^ `pkg-config --libs raylib guile-3.0` $(LDFLAGS)
 
 raylib.scm raylib-guile.c: raylib_api.xml generate-bindings.scm
 	guile ./generate-bindings.scm $<
