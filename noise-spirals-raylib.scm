@@ -4,8 +4,8 @@
 (use-modules (srfi srfi-16))
 (use-modules (ice-9 receive))
 
-(define screen-width 800)
-(define screen-height 600)
+(define screen-width 1280)
+(define screen-height 720)
 
 (define-macro (inc! x . rest)
   `(set! ,x (+ ,x ,(if (null? rest) 1 (car rest)))))
@@ -270,8 +270,7 @@
 	  (center-y (/ screen-height 2))
 	  (startradius (/ screen-width 2.5)))
       (draw-12 center-x center-y startradius t)
-      (draw-14 center-x center-y startradius t)
-      )
+      (draw-14 center-x center-y startradius t))
     (EndTextureMode)
     
     (BeginDrawing)
