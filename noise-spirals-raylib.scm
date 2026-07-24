@@ -215,7 +215,7 @@
 (define (raylib-draw-line x1 y1 x2 y2)
   (DrawLineEx (make-Vector2 x1 y1)
 	      (make-Vector2 x2 y2)
-	      2.5
+	      2.0
 	      *current-color*))
 
 (define (raylib-set-color r g b a)
@@ -242,23 +242,46 @@
 (define draw-12 (stateful-runner draw-noise-spiral12))
 (define draw-14 (stateful-runner draw-noise-spiral14))
 
+(SetConfigFlags FLAG_MSAA_4X_HINT)
 (InitWindow screen-width screen-height "raylib noise spirals")
 (SetTargetFPS 60)
 (define t 0)
 (define *current-color* (make-Color 255 255 255 255))
+(define target-canvas (LoadRenderTexture screen-width screen-height))
+;; In Raylib, textures are flipped vertically on the Y-axis.
+(define canvas-source-rect (make-Rectangle 0 0 screen-width (- screen-height)))
+(define canvas-dest-rect (make-Rectangle 0 0 screen-width screen-height))
+(define origin (make-Vector2 0 0))
+
+(BeginTextureMode target-canvas)
+(ClearBackground BLACK)
+(EndTextureMode)
+
+(define fade-overlay-color (make-Color 0 0 0 5))
 
 (define (main-loop)
   (unless (WindowShouldClose)
-    (inc! t 1)
-    (BeginDrawing)
-
-    (ClearBackground BLACK)
-
+    (set! t (+ t 0.016))
+    (BeginTextureMode target-canvas)
+    (BeginBlendMode BLEND_ALPHA)
+    (DrawRectangle 0 0 screen-width screen-height fade-overlay-color)
+    (EndBlendMode)
     (let ((center-x (/ screen-width 2))
 	  (center-y (/ screen-height 2))
 	  (startradius (/ screen-width 2.5)))
       (draw-12 center-x center-y startradius t)
-      (draw-14 center-x center-y startradius t))
+      (draw-14 center-x center-y startradius t)
+      )
+    (EndTextureMode)
+    
+    (BeginDrawing)
+    (ClearBackground BLACK)
+    (DrawTexturePro (RenderTexture-texture target-canvas)
+		    canvas-source-rect
+		    canvas-dest-rect
+		    origin
+		    0.0
+		    WHITE)
     (EndDrawing)
     (main-loop)))
 
