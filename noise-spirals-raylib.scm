@@ -28,8 +28,7 @@
 (define (deg->rad degrees)
   (* degrees (/ pi 180)))
 
-;;;; Perlin Noise (guile scheme)
-;; Complete 256-element Perlin permutation vector (0 to 255)
+;; 256 Permutation Table
 (define p
   #(151 160 137  91  90  15 131  13 201  95  96  53 194 233   7 225
     140  36 103  30  69 142   8  99  37 240  21  10  23 190   6 148
@@ -48,103 +47,53 @@
      65  79 156 227 169 150  42  11 183  22 178  88  19 143 202  76
     112   4 200 156 128  33 100  99 211 220  15   2 208 141 122 103))
 
+;; Doubled permutation array for zero-boundary lookups
+(define perm (make-vector 512 0))
+(let loop ((i 0))
+  (when (< i 512)
+    (vector-set! perm i (vector-ref p (logand i 255)))
+    (loop (+ i 1))))
+
+;; Ken Perlin's quintic smoothing curve: 6t^5 - 15t^4 + 10t^3
 (define (fade t)
-  "Ken Perlin's quintic easing curve: 6t^5 - 15t^4 + 10t^3"
   (* t t t (+ (* t (- (* t 6.0) 15.0)) 10.0)))
 
-(define (perlin-noise x y)
-  "2D Value/Perlin Noise returning a normalized float in [-1.0, 1.0]."
+(define (grad hash x y)
+  (let* ((h (logand hash 7))
+	 (u (if (< h 4) x y))
+	 (v (if (< h 4) y x)))
+    (+ (if (zero? (logand h 1)) u (- u))
+       (if (zero? (logand h 2)) v (- v)))))
+
+(define (perlin-2d x y)
   (let* ((fx (floor x))
 	 (fy (floor y))
-	 ;; Integer grid cell coordinates (0-255)
-	 (X (logand (inexact->exact (abs fx)) 255))
-	 (Y (logand (inexact->exact (abs fy)) 255))
-	 ;; Fractional offsets within cell
+	 (X (logand (inexact->exact fx) 255))
+	 (Y (logand (inexact->exact fy) 255))
 	 (xf (- x fx))
 	 (yf (- y fy))
-	 ;; Fade factors
 	 (u (fade xf))
 	 (v (fade yf))
 
-	 ;; Neighbor grid indices (using bitwise AND instead of modulo)
-	 (X1 X)
-	 (X2 (logand (+ X 1) 255))
+	 (A (+ (vector-ref perm X) Y))
+	 (B (+ (vector-ref perm (+ X 1)) Y))
 
-	 ;; Hash lookup
-	 (A (logand (+ (vector-ref p X1) Y) 255))
-	 (B (logand (+ (vector-ref p X2) Y) 255))
+	 (g00 (grad (vector-ref perm A) xf yf))
+	 (g10 (grad (vector-ref perm B) (- xf 1.0) yf))
+	 (g01 (grad (vector-ref perm (+ A 1)) xf (- yf 1.0)))
+	 (g11 (grad (vector-ref perm (+ B 1)) (- xf 1.0) (- yf 1.0)))
 
-	 ;; Corner values
-	 (aa (vector-ref p A))
-	 (ab (vector-ref p (logand (+ A 1) 255)))
-	 (ba (vector-ref p B))
-	 (bb (vector-ref p (logand (+ B 1) 255))))
+	 (x1 (lerp g00 g10 u))
+	 (x2 (lerp g01 g11 u))
+	 (raw (lerp x1 x2 v)))
+    ;; Map raw gradient output [-1.0, 1.0] to strictly [0.0, 1.0] (LÖVE range)
+    (max 0.0 (min 1.0 (+ (* raw 0.5) 0.5)))))
 
-    ;; Bilinear interpolation mapped to [-1.0, 1.0]
-    (- (/ (lerp (lerp aa ab u)
-		(lerp ba bb u)
-		v)
-	  128.0)
-       1.0)))
-
-(define (perlin-noise-1d x)
-  "1D noise evaluated along y = 0.5."
-  (perlin-noise x 0.5))
-
-(define (perlin-noise-3d x y z)
-  "3D Value/Perlin Noise returning a normalized float in [-1.0, 1.0]."
-  (let* ((fx (floor x))
-	 (fy (floor y))
-	 (fz (floor z))
-
-	 (X (logand (inexact->exact (abs fx)) 255))
-	 (Y (logand (inexact->exact (abs fy)) 255))
-	 (Z (logand (inexact->exact (abs fz)) 255))
-
-	 (xf (- x fx))
-	 (yf (- y fy))
-	 (zf (- z fz))
-
-	 (u (fade xf))
-	 (v (fade yf))
-	 (w (fade zf))
-
-	 ;; Hash X -> Y
-	 (A (logand (+ (vector-ref p X) Y) 255))
-	 (B (logand (+ (vector-ref p (logand (+ X 1) 255)) Y) 255))
-
-	 ;; Hash XY -> Z
-	 (AA (logand (+ (vector-ref p A) Z) 255))
-	 (AB (logand (+ (vector-ref p (logand (+ A 1) 255)) Z) 255))
-	 (BA (logand (+ (vector-ref p B) Z) 255))
-	 (BB (logand (+ (vector-ref p (logand (+ B 1) 255)) Z) 255))
-
-	 ;; 8 cube corners
-	 (aaa (vector-ref p AA))
-	 (aab (vector-ref p (logand (+ AA 1) 255)))
-	 (aba (vector-ref p AB))
-	 (abb (vector-ref p (logand (+ AB 1) 255)))
-	 (baa (vector-ref p BA))
-	 (bab (vector-ref p (logand (+ BA 1) 255)))
-	 (bba (vector-ref p BB))
-	 (bbb (vector-ref p (logand (+ BB 1) 255))))
-
-    ;; Trilinear interpolation across X, Y, and Z axes mapped to [-1.0, 1.0]
-    (- (/ (lerp (lerp (lerp aaa baa u)
-		      (lerp aba bba u)
-		      v)
-		(lerp (lerp aab bab u)
-		      (lerp abb bbb u)
-		      v)
-		w)
-	  128.0)
-       1.0)))
-
-(define noise
+(define love-noise
   (case-lambda
-    ((x)     (perlin-noise-1d x))
-    ((x y)   (perlin-noise x y))
-    ((x y z) (perlin-noise-3d x y z))))
+    "Variadic Gradient Noise matching LÖVE's love.math.noise"
+    ((x)     (perlin-2d x 0.5))
+    ((x y)   (perlin-2d x y))))
 
 (define (get-palette-color t)
   "Generate a cycling cyberpunk palette (cyans, magentas, deep purples)."
@@ -260,7 +209,7 @@
 (define raylib-config
   `((draw-line . ,raylib-draw-line)
     (set-color . ,raylib-set-color)
-    (noise-fn . ,noise)
+    (noise-fn . ,love-noise)
     (random-fn . ,(lambda () (random 1.0)))
     (smooth-noise-state . 0.0)))
 
