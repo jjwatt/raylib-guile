@@ -48,9 +48,9 @@
     112   4 200 156 128  33 100  99 211 220  15   2 208 141 122 103))
 
 ;; Doubled permutation array for zero-boundary lookups
-(define perm (make-vector 512 0))
+(define perm (make-vector 1024 0))
 (let loop ((i 0))
-  (when (< i 512)
+  (when (< i 1024)
     (vector-set! perm i (vector-ref p (logand i 255)))
     (loop (+ i 1))))
 
@@ -75,9 +75,11 @@
 	 (u (fade xf))
 	 (v (fade yf))
 
+	 ;; Double-hashed Permutation Indices
 	 (A (+ (vector-ref perm X) Y))
 	 (B (+ (vector-ref perm (+ X 1)) Y))
 
+	 ;; Corner Gradients
 	 (g00 (grad (vector-ref perm A) xf yf))
 	 (g10 (grad (vector-ref perm B) (- xf 1.0) yf))
 	 (g01 (grad (vector-ref perm (+ A 1)) xf (- yf 1.0)))
@@ -86,7 +88,7 @@
 	 (x1 (lerp g00 g10 u))
 	 (x2 (lerp g01 g11 u))
 	 (raw (lerp x1 x2 v)))
-    ;; Map raw gradient output [-1.0, 1.0] to strictly [0.0, 1.0] (LÖVE range)
+    ;; Map [-1.0, 1.0] to [0.0, 1.0]
     (max 0.0 (min 1.0 (+ (* raw 0.5) 0.5)))))
 
 (define love-noise
@@ -193,6 +195,23 @@
      (angle-jitter-scale . 1.0)
      (needs-smooth-state . #t))))
 
+(define draw-noise-spiral14
+  (make-spiral
+   `((name . "noise-spiral14")
+     (noise-strategy . ,(lambda (noise-fn _random-fn t angle _base-radius prev-smooth)
+			   (let ((raw (noise-fn (* t 2.0) angle)))
+			     (values (lerp prev-smooth raw 0.1)
+				     (expt raw 2.0)
+				     raw))))
+     (color-speed . 3.0)
+     (color-scale . 20.0)
+     (radius-noise . 5.0)
+     (radius-scale-fn . ,(lambda (t _)
+			   (+ 0.4 (* 0.2 (cos (* t 1.5))))))
+     (angle-jitter-scale . 2.0)
+     (needs-smooth-state . #t))))
+
+
 (define (raylib-draw-line x1 y1 x2 y2)
   (DrawLineEx (make-Vector2 x1 y1)
 	      (make-Vector2 x2 y2)
@@ -221,6 +240,7 @@
       (set! state (draw-fn raylib-config center-x center-y max-radius t)))))
 
 (define draw-12 (stateful-runner draw-noise-spiral12))
+(define draw-14 (stateful-runner draw-noise-spiral14))
 
 (InitWindow screen-width screen-height "raylib noise spirals")
 (SetTargetFPS 60)
@@ -237,7 +257,8 @@
     (let ((center-x (/ screen-width 2))
 	  (center-y (/ screen-height 2))
 	  (startradius (/ screen-width 2.5)))
-      (draw-12 center-x center-y startradius t))
+      (draw-12 center-x center-y startradius t)
+      (draw-14 center-x center-y startradius t))
     (EndDrawing)
     (main-loop)))
 
