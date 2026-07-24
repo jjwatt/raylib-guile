@@ -24,7 +24,7 @@
 (define (deg->rad degrees)
   (* degrees (/ pi 180)))
 
-;;;; Perlin Noise (s7 Scheme for TIC-80)
+;;;; Perlin Noise (guile scheme)
 ;; Complete 256-element Perlin permutation vector (0 to 255)
 (define p 
   #(151 160 137  91  90  15 131  13 201  95  96  53 194 233   7 225
