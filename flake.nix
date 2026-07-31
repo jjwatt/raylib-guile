@@ -16,13 +16,9 @@
     }:
     let
       mkRaylibGuile = pkgs: pkgs.callPackage ./default.nix { };
-    in
-    flake-utils.lib.eachDefaultSystem (
-      system:
-      let
-        isDarwin = nixpkgs.lib.hasSuffix "-darwin" system;
 
-        gcOverlay = final: prev: {
+      gcOverlay = final: prev:
+        if prev.stdenv.isDarwin then {
           boehmgc = prev.boehmgc.overrideAttrs (oldAttrs: {
             configureFlags = (oldAttrs.configureFlags or [ ]) ++ [ "--enable-large-config" ];
             NIX_CFLAGS_COMPILE = (oldAttrs.NIX_CFLAGS_COMPILE or "") + " -DLARGE_CONFIG";
@@ -30,9 +26,16 @@
           guile_3_0 = prev.guile_3_0.override {
             boehmgc = final.boehmgc;
           };
-        };
+        } else { };
 
-        overlays = (if isDarwin then [ gcOverlay ] else [ ])
+      overlay = final: prev: (gcOverlay final prev) // {
+        raylib-guile = mkRaylibGuile final;
+      };
+    in
+    flake-utils.lib.eachDefaultSystem (
+      system:
+      let
+        overlays = [ gcOverlay ]
           ++ (if system == "x86_64-linux" then [ nixgl.overlay ] else [ ]);
         pkgs = import nixpkgs {
           inherit system overlays;
@@ -73,8 +76,6 @@
         };
       }
     ) // {
-      overlays.default = final: prev: {
-        raylib-guile = mkRaylibGuile final;
-      };
+      overlays.default = overlay;
     };
 }
