@@ -1,5 +1,19 @@
 {
-  pkgs ? import <nixpkgs> { },
+  pkgs ? import <nixpkgs> {
+    overlays = [
+      (final: prev:
+        if prev.stdenv.isDarwin then {
+          boehmgc = prev.boehmgc.overrideAttrs (oldAttrs: {
+            configureFlags = (oldAttrs.configureFlags or [ ]) ++ [ "--enable-large-config" ];
+            NIX_CFLAGS_COMPILE = (oldAttrs.NIX_CFLAGS_COMPILE or "") + " -DLARGE_CONFIG";
+          });
+          guile_3_0 = prev.guile_3_0.override {
+            boehmgc = final.boehmgc;
+          };
+        } else { }
+      )
+    ];
+  },
 }:
 
 pkgs.stdenv.mkDerivation {

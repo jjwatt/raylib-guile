@@ -20,7 +20,20 @@
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        overlays = if system == "x86_64-linux" then [ nixgl.overlay ] else [ ];
+        isDarwin = nixpkgs.lib.hasSuffix "-darwin" system;
+
+        gcOverlay = final: prev: {
+          boehmgc = prev.boehmgc.overrideAttrs (oldAttrs: {
+            configureFlags = (oldAttrs.configureFlags or [ ]) ++ [ "--enable-large-config" ];
+            NIX_CFLAGS_COMPILE = (oldAttrs.NIX_CFLAGS_COMPILE or "") + " -DLARGE_CONFIG";
+          });
+          guile_3_0 = prev.guile_3_0.override {
+            boehmgc = final.boehmgc;
+          };
+        };
+
+        overlays = (if isDarwin then [ gcOverlay ] else [ ])
+          ++ (if system == "x86_64-linux" then [ nixgl.overlay ] else [ ]);
         pkgs = import nixpkgs {
           inherit system overlays;
         };
@@ -47,6 +60,7 @@
 
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
+            pkg-config
             gmp
             guile_3_0-wrapped
             raylib
